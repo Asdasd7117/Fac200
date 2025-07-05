@@ -1,128 +1,80 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
-  <title>لوحة المستخدم</title>
+  <meta charset="UTF-8">
+  <title>لوحة التحكم</title>
   <style>
-    body { font-family: sans-serif; background: #f9f9f9; direction: rtl; padding: 20px; }
-    .container { max-width: 700px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px #ccc; }
-    input, button { padding: 10px; margin-top: 10px; width: 100%; border-radius: 5px; border: 1px solid #ccc; }
-    #pagesList li { background: #f0f0f0; margin-top: 10px; padding: 10px; border-radius: 5px; list-style: none; }
-    #refBox { background: #d4fcd4; padding: 10px; margin-top: 20px; border-radius: 5px; font-weight: bold; }
+    body { font-family: sans-serif; background: #f9f9f9; padding: 20px; direction: rtl; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    ul { list-style: none; padding: 0; }
+    li { background: #eef; padding: 10px; margin-top: 10px; border-radius: 5px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>مرحبا بك</h2>
-    <p>📧 <span id="userEmail">جارٍ التحميل...</span></p>
+    <h2>مرحبًا بك!</h2>
+    <p id="userEmail">📧 ...</p>
     <p>⭐ نقاطك: <span id="points">0</span></p>
 
-    <h3>رابط صفحتك على فيسبوك</h3>
-    <input type="text" id="pageInput" placeholder="أدخل رابط صفحتك">
-    <button onclick="savePage()">💾 حفظ</button>
+    <h3>🔗 رابط صفحتك على فيسبوك</h3>
+    <input type="text" id="pageInput" placeholder="ضع رابط صفحتك هنا">
+    <button id="saveBtn">حفظ</button>
 
-    <div id="refBox">
-      رابط الإحالة: <span id="refLink"></span>
-      <button onclick="copyRef()">📋 نسخ</button>
-    </div>
-
-    <h3>تابع صفحات الآخرين لكسب النقاط</h3>
+    <h3>📄 صفحات متاحة للمتابعة:</h3>
     <ul id="pagesList">جاري التحميل...</ul>
   </div>
 
   <script type="module">
     import { supabase } from './supabase-config.js';
 
-    let user, userId;
+    let currentUser = null;
+    let currentUserData = null;
 
-    async function init() {
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session) return location.href = "index.html";
+    // تحقق من الجلسة
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) location.href = "index.html";
 
-      user = session.user;
-      userId = user.id;
-      document.getElementById("userEmail").innerText = user.email;
+    const user = session.user;
+    currentUser = user;
 
-      const { data, error } = await supabase.from("users").select("*").eq("id", userId).single();
+    document.getElementById("userEmail").textContent = user.email;
 
-      if (data) {
-        document.getElementById("points").innerText = data.points || 0;
-        document.getElementById("pageInput").value = data.facebook_page || "";
-        document.getElementById("refLink").innerText = `${location.origin}/index.html?ref=${userId}`;
-        loadPages(data);
-      }
+    const { data: userData } = await supabase.from('sami').select('*').eq('email', user.email).single();
+    currentUserData = userData;
+
+    document.getElementById("points").textContent = userData.points || 0;
+
+    if (userData.facebook_page) {
+      document.getElementById("pageInput").value = userData.facebook_page;
     }
 
-    async function savePage() {
+    document.getElementById("saveBtn").onclick = async () => {
       const url = document.getElementById("pageInput").value.trim();
       if (!url.startsWith("http")) return alert("رابط غير صالح");
-      await supabase.from("users").update({ facebook_page: url }).eq("id", userId);
+
+      await supabase.from('sami').update({ facebook_page: url }).eq('id', userData.id);
       alert("✅ تم الحفظ");
-    }
+    };
 
-    async function loadPages(currentUserData) {
-      const list = document.getElementById("pagesList");
-      const { data, error } = await supabase.from("users").select("*");
+    // تحميل صفحات المستخدمين الآخرين
+    const { data: allUsers } = await supabase.from('sami').select('*');
+    const others = allUsers.filter(u => u.id !== userData.id && u.facebook_page && (u.points || 0) >= 1);
 
-      if (error) return list.innerHTML = "❌ فشل تحميل الصفحات";
-
-      const followed = currentUserData.followed_ids || [];
-
-      const available = data.filter(u =>
-        u.id !== userId &&
-        u.facebook_page &&
-        u.points > 0 &&
-        !followed.includes(u.id)
-      );
-
-      if (available.length === 0) return list.innerHTML = "<li>لا توجد صفحات حالياً</li>";
-
+    const list = document.getElementById("pagesList");
+    if (others.length === 0) {
+      list.innerHTML = "<li>لا توجد صفحات حالياً</li>";
+    } else {
       list.innerHTML = "";
-      available.forEach(user => {
+      others.forEach(u => {
         const li = document.createElement("li");
         li.innerHTML = `
-          <a href="${user.facebook_page}" target="_blank">🔗 ${user.email || "صفحة"}</a>
-          <button onclick="confirmFollow('${user.id}')">✅ تابعت الصفحة</button>
+          📧 ${u.email}<br>
+          <a href="${u.facebook_page}" target="_blank">🔗 زيارة الصفحة</a>
         `;
         list.appendChild(li);
       });
     }
-
-    window.savePage = savePage;
-
-    window.copyRef = () => {
-      const link = document.getElementById("refLink").innerText;
-      navigator.clipboard.writeText(link);
-      alert("تم نسخ رابط الإحالة");
-    };
-
-    window.confirmFollow = async (targetId) => {
-      if (!confirm("هل تابعت الصفحة فعلاً؟")) return;
-
-      const { data: targetData } = await supabase.from("users").select("*").eq("id", targetId).single();
-      if (!targetData || targetData.points < 1) {
-        return alert("صاحب الصفحة لا يملك نقاطاً كافية.");
-      }
-
-      const userRes = await supabase.from("users").select("*").eq("id", userId).single();
-      const currentPoints = userRes.data.points || 0;
-      const followed = userRes.data.followed_ids || [];
-
-      await supabase.from("users").update({
-        points: currentPoints + 1,
-        followed_ids: [...followed, targetId]
-      }).eq("id", userId);
-
-      await supabase.from("users").update({
-        points: targetData.points - 1
-      }).eq("id", targetId);
-
-      alert("✅ تمت المتابعة وتمت إضافة نقطة لك");
-
-      loadPages({ ...userRes.data, followed_ids: [...followed, targetId] });
-    };
-
-    init();
   </script>
 </body>
 </html>
