@@ -69,7 +69,7 @@
     };
 
     async function loadUsers() {
-      const { data: users, error } = await supabase.from("sami").select("*");
+      const { data: users, error } = await supabase.from("User").select("*");
       const container = document.getElementById("userList");
       container.innerHTML = "";
 
