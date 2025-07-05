@@ -38,37 +38,41 @@
   <script type="module">
     import { supabase } from './supabase-config.js';
 
-    // عند الضغط على زر الدخول
+    // عند الضغط على زر تسجيل الدخول
     document.getElementById("loginBtn").onclick = async () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: location.href }
+        options: {
+          redirectTo: window.location.href  // يعيدك لنفس الصفحة بعد تسجيل الدخول
+        }
       });
-      if (error) alert("فشل تسجيل الدخول");
+
+      if (error) {
+        alert("فشل تسجيل الدخول");
+      }
     };
 
-    // التحقق إذا كان هناك جلسة حالياً
+    // التحقق من وجود جلسة وتسجيل المستخدم في قاعدة البيانات
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session) {
-      const { user } = session;
-      const { id, email } = user;
+      const user = session.user;
+      const id = user.id;
+      const email = user.email;
 
-      // التأكد إن كان المستخدم موجود بالفعل
-      const { data: existing, error: getError } = await supabase
+      // تحقق إذا المستخدم موجود
+      const { data: exists, error: selectError } = await supabase
         .from('users')
         .select('*')
         .eq('id', id)
         .single();
 
-      // إذا لم يكن موجود، أضفه إلى الجدول
-      if (!existing && !getError) {
-        await supabase.from('users').insert([
-          { id: id, email: email }
-        ]);
+      // إذا ما وجدناه نضيفه
+      if (!exists && !selectError) {
+        await supabase.from('users').insert([{ id, email }]);
       }
 
-      // الانتقال إلى لوحة التحكم
+      // التوجيه إلى لوحة التحكم
       location.href = "dashboard.html";
     }
   </script>
