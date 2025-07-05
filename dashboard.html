@@ -4,15 +4,54 @@
   <meta charset="UTF-8">
   <title>لوحة التحكم</title>
   <style>
-    body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
-    ul { list-style-type: none; padding: 0; }
-    li { padding: 10px; background: #eef; margin-top: 10px; border-radius: 5px; }
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+      direction: rtl;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    ul { list-style: none; padding: 0; }
+    li {
+      background: #eee;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .ref-box {
+      background: #d0f5d0;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 2px solid green;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="ref-box">
+      رابط الإحالة: 
+      <button id="refBtn">عرض</button>
+      <div id="refArea" class="hidden" style="display:none;">
+        <input type="text" id="refLink" readonly />
+        <button id="copyRef">نسخ</button>
+      </div>
+    </div>
+
     <h2>مرحباً بك</h2>
     <p id="userEmail"></p>
     <p>نقاطك: <span id="points">0</span></p>
@@ -21,68 +60,137 @@
     <input type="text" id="pageInput" placeholder="ضع رابط صفحتك">
     <button id="savePageBtn">حفظ</button>
 
-    <h3>تابع صفحات الآخرين</h3>
+    <h3>تابع صفحات الآخرين لكسب النقاط</h3>
     <ul id="pagesList"></ul>
   </div>
 
   <script type="module">
     import { supabase } from './supabase-config.js';
 
-    let userId, userData;
+    let currentUser, userData;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) location.href = 'index.html';
+    async function loadUser() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return location.href = "index.html";
 
-    const user = session.user;
-    userId = user.id;
-    document.getElementById("userEmail").innerText = user.email;
+      currentUser = session.user;
 
-    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
-    userData = data || {};
-    document.getElementById("points").innerText = userData.points || 0;
+      const { data, error } = await supabase.from("users").select("*").eq("id", currentUser.id).single();
+      if (error) return alert("فشل في تحميل بيانات المستخدم");
 
-    document.getElementById("pageInput").value = userData.facebook_page || "";
+      userData = data;
+      document.getElementById("userEmail").innerText = userData.email;
+      document.getElementById("points").innerText = userData.points || 0;
 
-    document.getElementById("savePageBtn").onclick = async () => {
-      const url = document.getElementById("pageInput").value.trim();
-      if (!url.startsWith("http")) return alert("رابط غير صالح");
-      await supabase.from("users").upsert({ id: userId, facebook_page: url });
-      alert("تم الحفظ");
-    };
+      // رابط الإحالة
+      const refLink = `${location.origin}/index.html?ref=${currentUser.id}`;
+      document.getElementById("refBtn").onclick = () => {
+        document.getElementById("refArea").style.display = "block";
+        document.getElementById("refLink").value = refLink;
+      };
+      document.getElementById("copyRef").onclick = () => {
+        navigator.clipboard.writeText(refLink);
+        alert("تم نسخ رابط الإحالة");
+      };
 
-    async function loadOthers() {
-      const res = await supabase.from("users").select("*");
+      // حفظ رابط الفيسبوك
+      document.getElementById("pageInput").value = userData.facebook_page || "";
+      document.getElementById("savePageBtn").onclick = async () => {
+        const url = document.getElementById("pageInput").value.trim();
+        if (!url.startsWith("http")) return alert("رابط غير صالح");
+        const { error } = await supabase.from("users").update({ facebook_page: url }).eq("id", currentUser.id);
+        if (!error) alert("تم حفظ الرابط");
+      };
+
+      loadOtherPages();
+    }
+
+    async function loadOtherPages() {
       const list = document.getElementById("pagesList");
       list.innerHTML = "";
 
-      res.data.forEach(u => {
-        if (u.id === userId || !u.facebook_page || u.points < 1) return;
+      const { data, error } = await supabase.from("users").select("*");
+      if (error) return alert("❌ خطأ أثناء تحميل الصفحات");
+
+      for (let user of data) {
+        if (
+          user.id === currentUser.id ||
+          !user.facebook_page ||
+          user.points < 1 ||
+          (userData.followed_users || []).includes(user.id)
+        ) continue;
+
         const li = document.createElement("li");
+        const btnId = `btn_${user.id}`;
+        const timerId = `t_${user.id}`;
+
         li.innerHTML = `
-          <a href="${u.facebook_page}" target="_blank">${u.email}</a><br>
-          <input type="file" id="proof_${u.id}" accept="image/*">
-          <button onclick="uploadProof('${u.id}')">رفع إثبات</button>
+          <a href="${user.facebook_page}" target="_blank">صفحة ${user.email}</a><br>
+          <button onclick="openPage('${user.facebook_page}', '${btnId}', '${timerId}')">افتح الصفحة</button>
+          <span id="${timerId}">⏳ 10</span>
+          <button id="${btnId}" onclick="confirmFollow('${user.id}', this)" disabled>تابعت</button>
         `;
         list.appendChild(li);
-      });
+      }
     }
 
-    window.uploadProof = async (targetId) => {
-      const fileInput = document.getElementById("proof_" + targetId);
-      const file = fileInput.files[0];
-      if (!file) return alert("اختر صورة أولاً");
+    window.openPage = (url, btnId, timerId) => {
+      window.open(url, '_blank');
+      let count = 10;
+      const sp = document.getElementById(timerId);
+      const btn = document.getElementById(btnId);
 
-      const target = await supabase.from('users').select('*').eq('id', targetId).single();
-      if (target.data.points < 1) return alert("صاحب الصفحة لا يملك نقاطاً");
-
-      await supabase.from('users').update({ points: (userData.points || 0) + 1 }).eq('id', userId);
-      await supabase.from('users').update({ points: target.data.points - 1 }).eq('id', targetId);
-
-      alert("✅ تمت العملية!");
-      loadOthers();
+      const iv = setInterval(() => {
+        count--;
+        sp.innerText = `⏳ ${count}`;
+        if (count <= 0) {
+          clearInterval(iv);
+          btn.disabled = false;
+          sp.innerText = "✅";
+        }
+      }, 1000);
     };
 
-    loadOthers();
+    window.confirmFollow = async (targetId, btn) => {
+      if (!confirm("هل تابعت الصفحة فعلاً؟")) return;
+
+      // اجلب بيانات صاحب الصفحة
+      const { data: targetData } = await supabase.from("users").select("*").eq("id", targetId).single();
+      if (!targetData || targetData.points < 1) return alert("صاحب الصفحة لا يملك نقاطاً");
+
+      // أضف نقطة لك وخصم من صاحب الصفحة
+      await supabase.from("users").update({
+        points: (userData.points || 0) + 1,
+        followed_users: [...(userData.followed_users || []), targetId],
+        follow_count: (userData.follow_count || 0) + 1
+      }).eq("id", currentUser.id);
+
+      await supabase.from("users").update({
+        points: targetData.points - 1
+      }).eq("id", targetId);
+
+      btn.parentElement.remove();
+      alert("✅ تمت المتابعة وكسبت نقطة");
+
+      // تحقق من إحالة
+      const { data: updatedUser } = await supabase.from("users").select("*").eq("id", currentUser.id).single();
+      if (
+        updatedUser.follow_count >= 5 &&
+        updatedUser.referrer &&
+        !updatedUser.referral_credited
+      ) {
+        const { data: refUser } = await supabase.from("users").select("*").eq("id", updatedUser.referrer).single();
+        await supabase.from("users").update({
+          points: (refUser.points || 0) + 10
+        }).eq("id", refUser.id);
+        await supabase.from("users").update({
+          referral_credited: true
+        }).eq("id", currentUser.id);
+        alert("🎁 تمت إضافة 10 نقاط لمُحيلك");
+      }
+    };
+
+    loadUser();
   </script>
 </body>
 </html>
