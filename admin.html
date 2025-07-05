@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة الإدارة</title>
+  <style>
+    body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+    .admin-panel { background: white; padding: 20px; max-width: 600px; margin: auto; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <div class="admin-panel">
+    <h2>تسجيل دخول الأدمن</h2>
+    <input type="text" id="adminUser" placeholder="اسم المستخدم">
+    <input type="password" id="adminPass" placeholder="كلمة المرور">
+    <button onclick="adminLogin()">دخول</button>
+
+    <div id="controls" style="display:none;">
+      <h3>التحكم بالمستخدم</h3>
+      <input type="text" id="userEmail" placeholder="بريد المستخدم">
+      <input type="number" id="addPoints" placeholder="عدد النقاط">
+      <button onclick="givePoints()">إضافة نقاط</button>
+      <button onclick="deletePage()">حذف صفحة المستخدم</button>
+      <button onclick="deleteUser()">حذف المستخدم</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase } from './supabase-config.js';
+
+    window.adminLogin = () => {
+      const u = document.getElementById("adminUser").value;
+      const p = document.getElementById("adminPass").value;
+      if (u === 'samigmail' && p === 'Asdasd7117') {
+        document.getElementById("controls").style.display = 'block';
+        alert("تم الدخول");
+      } else {
+        alert("بيانات خاطئة");
+      }
+    };
+
+    window.givePoints = async () => {
+      const email = document.getElementById("userEmail").value;
+      const points = parseInt(document.getElementById("addPoints").value);
+      const { data } = await supabase.from('users').select('*').eq('email', email).single();
+      if (!data) return alert("المستخدم غير موجود");
+
+      await supabase.from('users').update({ points: (data.points || 0) + points }).eq('id', data.id);
+      alert("✅ تم إضافة النقاط");
+    };
+
+    window.deletePage = async () => {
+      const email = document.getElementById("userEmail").value;
+      const { data } = await supabase.from('users').select('*').eq('email', email).single();
+      if (!data) return alert("المستخدم غير موجود");
+
+      await supabase.from('users').update({ facebook_page: null }).eq('id', data.id);
+      alert("✅ تم حذف الصفحة");
+    };
+
+    window.deleteUser = async () => {
+      const email = document.getElementById("userEmail").value;
+      const { data } = await supabase.from('users').select('*').eq('email', email).single();
+      if (!data) return alert("المستخدم غير موجود");
+
+      await supabase.from('users').delete().eq('id', data.id);
+      alert("✅ تم حذف المستخدم");
+    };
+  </script>
+</body>
+</html>
