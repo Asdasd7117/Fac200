@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تسجيل الدخول</title>
+  <style>
+    body { font-family: sans-serif; background: #eef; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2); text-align: center; }
+    button { background: #4285F4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>سجل الدخول بحساب جوجل</h2>
+    <button id="loginBtn">تسجيل الدخول</button>
+  </div>
+  <script type="module">
+    import { supabase } from './supabase-config.js';
+    document.getElementById("loginBtn").onclick = async () => {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if (error) alert("فشل تسجيل الدخول");
+    };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) location.href = "dashboard.html";
+  </script>
+</body>
+</html>
