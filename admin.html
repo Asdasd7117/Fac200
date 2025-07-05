@@ -4,11 +4,36 @@
   <meta charset="UTF-8">
   <title>لوحة الإدارة</title>
   <style>
-    body { font-family: sans-serif; background: #f9f9f9; padding: 20px; }
-    .admin-panel { background: white; padding: 20px; max-width: 800px; margin: auto; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    input, button { padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #ccc; width: 100%; }
-    .user-card { border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px; background: #fff; }
-    .user-card button { width: auto; margin-right: 10px; }
+    body {
+      font-family: sans-serif;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    .admin-panel {
+      background: white;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .user-card {
+      background: #fafafa;
+      padding: 15px;
+      border: 1px solid #ddd;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+    .user-card button {
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -19,19 +44,24 @@
     <button onclick="adminLogin()">دخول</button>
 
     <div id="controls" style="display:none;">
-      <h3>المستخدمون:</h3>
+      <h3>قائمة المستخدمين</h3>
       <div id="userList"></div>
     </div>
   </div>
 
   <script type="module">
-    import { supabase } from './supabase-config.js';
+    import { createClient } from "https://esm.sh/@supabase/supabase-js";
+
+    const supabase = createClient(
+      "https://wwwdjpphvsdftfipwowa.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3d2RqcHBodnNkZnRmaXB3b3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MTA3NTgsImV4cCI6MjA2NzI4Njc1OH0.vYAj3S_KpDcs7Rv1u_xA1rNYD042HtlPR1S9gEcHdAI"
+    );
 
     window.adminLogin = () => {
-      const u = document.getElementById("adminUser").value.trim();
-      const p = document.getElementById("adminPass").value.trim();
-      if (u === 'samigmail' && p === 'Asdasd7117') {
-        document.getElementById("controls").style.display = 'block';
+      const u = document.getElementById("adminUser").value;
+      const p = document.getElementById("adminPass").value;
+      if (u === "samigmail" && p === "Asdasd7117") {
+        document.getElementById("controls").style.display = "block";
         loadUsers();
       } else {
         alert("❌ بيانات الدخول غير صحيحة");
@@ -39,54 +69,48 @@
     };
 
     async function loadUsers() {
+      const { data: users, error } = await supabase.from("users").select("*");
       const container = document.getElementById("userList");
-      container.innerHTML = "⏳ جاري التحميل...";
-      const { data: users, error } = await supabase.from("sami").select("*");
+      container.innerHTML = "";
 
       if (error || !users) {
-        console.error("خطأ Supabase:", error);
-        container.innerHTML = "❌ حدث خطأ أثناء تحميل المستخدمين";
+        container.innerHTML = "<p style='color:red;'>❌ حدث خطأ أثناء تحميل المستخدمين</p>";
+        console.error(error);
         return;
       }
 
-      container.innerHTML = "";
       users.forEach(user => {
         const div = document.createElement("div");
         div.className = "user-card";
         div.innerHTML = `
-          <p><strong>📧</strong> ${user.email}</p>
-          <p><strong>🏆 النقاط:</strong> ${user.points ?? 0}</p>
-          <p><strong>🔗 صفحة فيسبوك:</strong> ${user.facebook_page || 'لا توجد'}</p>
-          <input type="number" id="points_${user.id}" placeholder="عدد النقاط">
-          <button onclick="givePoints('${user.id}')">➕ أضف نقاط</button>
-          <button onclick="deletePage('${user.id}')">🗑 حذف الصفحة</button>
-          <button onclick="deleteUser('${user.id}')">❌ حذف المستخدم</button>
+          <p><strong>📧 البريد:</strong> ${user.email || "غير متوفر"}</p>
+          <p><strong>⭐ النقاط:</strong> ${user.points || 0}</p>
+          <button onclick="givePoints('${user.id}', '${user.points || 0}')">➕ إضافة نقاط</button>
+          <button onclick="deletePage('${user.id}')">🗑️ حذف الصفحة</button>
+          <button onclick="deleteUser('${user.id}')">🚫 حذف المستخدم</button>
         `;
         container.appendChild(div);
       });
     }
 
-    window.givePoints = async (id) => {
-      const value = parseInt(document.getElementById("points_" + id).value);
-      if (!value || value <= 0) return alert("أدخل عددًا صالحًا من النقاط");
-
-      const { data, error } = await supabase.from("sami").select("*").eq("id", id).single();
-      if (error || !data) return alert("❌ المستخدم غير موجود");
-
-      await supabase.from("sami").update({ points: (data.points || 0) + value }).eq("id", id);
+    window.givePoints = async (userId, currentPoints) => {
+      const points = prompt("كم عدد النقاط التي تريد إضافتها؟", "10");
+      if (!points) return;
+      const newPoints = parseInt(currentPoints) + parseInt(points);
+      await supabase.from("users").update({ points: newPoints }).eq("id", userId);
       alert("✅ تم إضافة النقاط");
       loadUsers();
     };
 
-    window.deletePage = async (id) => {
-      await supabase.from("sami").update({ facebook_page: null }).eq("id", id);
-      alert("✅ تم حذف صفحة الفيسبوك");
+    window.deletePage = async (userId) => {
+      await supabase.from("users").update({ facebook_page: null }).eq("id", userId);
+      alert("✅ تم حذف رابط الصفحة");
       loadUsers();
     };
 
-    window.deleteUser = async (id) => {
-      if (!confirm("⚠️ هل أنت متأكد أنك تريد حذف هذا المستخدم؟")) return;
-      await supabase.from("sami").delete().eq("id", id);
+    window.deleteUser = async (userId) => {
+      if (!confirm("هل أنت متأكد من حذف المستخدم؟")) return;
+      await supabase.from("users").delete().eq("id", userId);
       alert("✅ تم حذف المستخدم");
       loadUsers();
     };
