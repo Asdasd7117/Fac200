@@ -83,7 +83,7 @@
     };
 
     async function loadUsers() {
-      const { data: users, error } = await supabase.from("users").select("*");
+      const { data: users, error } = await supabase.from("sami").select("*");
       if (error) {
         console.error("Supabase error:", error);
         userContainer.innerHTML = "❌ حدث خطأ أثناء تحميل المستخدمين";
