@@ -1,138 +1,122 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>لوحة الإدارة</title>
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f4f4f4;
-      padding: 20px;
-      direction: rtl;
-    }
-    .admin-panel {
-      max-width: 800px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #ccc;
-    }
-    h2, h3 {
-      color: #333;
-    }
-    input, button {
-      padding: 10px;
-      margin-top: 5px;
-      margin-bottom: 10px;
-      width: 100%;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    .card {
-      background: #f9f9f9;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      border: 1px solid #ddd;
-    }
-    button {
-      cursor: pointer;
-    }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 20px; direction: rtl; }
+    .admin-panel { background: white; padding: 20px; max-width: 800px; margin: auto; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, button { padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    button { cursor: pointer; }
+    .user-card { border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin-top: 10px; background: #fff; }
   </style>
 </head>
 <body>
   <div class="admin-panel">
-    <h2>تسجيل دخول الأدمن</h2>
+    <h2>لوحة دخول الأدمن</h2>
     <input type="text" id="adminUser" placeholder="اسم المستخدم">
     <input type="password" id="adminPass" placeholder="كلمة المرور">
     <button onclick="adminLogin()">دخول</button>
 
-    <div id="userSection" style="display:none;">
-      <h3>المستخدمون المسجلون</h3>
-      <div id="usersList">⏳ جاري التحميل...</div>
+    <div id="controls" style="display:none;">
+      <h3>إدارة المستخدمين</h3>
+      <div id="usersList">جاري التحميل...</div>
     </div>
   </div>
 
   <script type="module">
-    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    // بيانات مشروعك في Supabase
     const supabase = createClient(
       "https://wwwdjpphvsdftfipwowa.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3d2RqcHBodnNkZnRmaXB3b3dhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MTA3NTgsImV4cCI6MjA2NzI4Njc1OH0.vYAj3S_KpDcs7Rv1u_xA1rNYD042HtlPR1S9gEcHdAI"
     );
 
-    const ADMIN_USERNAME = "samigmail";
-    const ADMIN_PASSWORD = "Asdasd7117";
-
     window.adminLogin = async () => {
-      const u = document.getElementById("adminUser").value;
-      const p = document.getElementById("adminPass").value;
+      const user = document.getElementById("adminUser").value;
+      const pass = document.getElementById("adminPass").value;
 
-      if (u === ADMIN_USERNAME && p === ADMIN_PASSWORD) {
-        document.getElementById("userSection").style.display = "block";
+      if (user === "samigmail" && pass === "Asdasd7117") {
+        document.getElementById("controls").style.display = "block";
         loadUsers();
       } else {
-        alert("بيانات خاطئة");
+        alert("❌ بيانات خاطئة");
       }
     };
 
     async function loadUsers() {
-      const usersList = document.getElementById("usersList");
-      usersList.innerHTML = "⏳ جاري التحميل...";
+      const container = document.getElementById("usersList");
+      container.innerHTML = "جاري التحميل...";
 
-      const { data, error } = await supabase.from("sami").select("*");
-
+      const { data, error } = await supabase.from('sami').select('*');
       if (error || !data) {
-        usersList.innerHTML = "❌ حدث خطأ أثناء تحميل المستخدمين";
+        container.innerHTML = "❌ حدث خطأ أثناء تحميل المستخدمين";
+        console.error(error);
         return;
       }
 
-      usersList.innerHTML = "";
+      if (data.length === 0) {
+        container.innerHTML = "🚫 لا يوجد مستخدمون";
+        return;
+      }
+
+      container.innerHTML = "";
       data.forEach(user => {
         const div = document.createElement("div");
-        div.className = "card";
+        div.className = "user-card";
         div.innerHTML = `
           <p><strong>📧 البريد:</strong> ${user.email || "غير متوفر"}</p>
           <p><strong>⭐ النقاط:</strong> ${user.points || 0}</p>
-          <button onclick="givePoints('${user.id}', ${user.points || 0})">➕ إضافة نقاط</button>
-          <button onclick="deletePage('${user.id}')">🗑️ حذف صفحة فيسبوك</button>
+          <button onclick="addPoints('${user.id}', ${user.points || 0})">➕ إضافة نقاط</button>
+          <button onclick="removePage('${user.id}')">🗑️ حذف الصفحة</button>
           <button onclick="deleteUser('${user.id}')">🚫 حذف المستخدم</button>
-          <button onclick="banUser('${user.id}')">❌ حظر المستخدم</button>
         `;
-        usersList.appendChild(div);
+        container.appendChild(div);
       });
     }
 
-    window.givePoints = async (id, currentPoints) => {
-      const amount = prompt("كم عدد النقاط التي تريد إضافتها؟");
-      if (!amount) return;
-      const points = parseInt(amount);
-      if (isNaN(points)) return alert("قيمة غير صالحة");
+    window.addPoints = async (id, currentPoints) => {
+      const amount = parseInt(prompt("كم عدد النقاط التي تريد إضافتها؟"));
+      if (isNaN(amount)) return;
 
-      await supabase.from("sami").update({ points: currentPoints + points }).eq("id", id);
-      alert("✅ تم التحديث");
-      loadUsers();
+      const { error } = await supabase
+        .from('sami')
+        .update({ points: currentPoints + amount })
+        .eq('id', id);
+
+      if (!error) {
+        alert("✅ تم إضافة النقاط");
+        loadUsers();
+      } else {
+        alert("❌ خطأ أثناء الإضافة");
+      }
     };
 
-    window.deletePage = async (id) => {
-      await supabase.from("sami").update({ facebook_page: null }).eq("id", id);
-      alert("✅ تم حذف رابط الصفحة");
-      loadUsers();
+    window.removePage = async (id) => {
+      const { error } = await supabase
+        .from('sami')
+        .update({ facebook_page: null })
+        .eq('id', id);
+
+      if (!error) {
+        alert("✅ تم حذف الصفحة");
+        loadUsers();
+      } else {
+        alert("❌ خطأ أثناء حذف الصفحة");
+      }
     };
 
     window.deleteUser = async (id) => {
-      if (!confirm("هل أنت متأكد من حذف المستخدم؟")) return;
-      await supabase.from("sami").delete().eq("id", id);
-      alert("✅ تم حذف المستخدم");
-      loadUsers();
-    };
+      if (!confirm("❗ هل أنت متأكد من حذف المستخدم؟")) return;
 
-    window.banUser = async (id) => {
-      await supabase.from("sami").update({ is_banned: true }).eq("id", id);
-      alert("✅ تم حظر المستخدم");
-      loadUsers();
+      const { error } = await supabase.from('sami').delete().eq('id', id);
+
+      if (!error) {
+        alert("✅ تم حذف المستخدم");
+        loadUsers();
+      } else {
+        alert("❌ خطأ أثناء حذف المستخدم");
+      }
     };
   </script>
 </body>
