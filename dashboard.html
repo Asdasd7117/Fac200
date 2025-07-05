@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة التحكم</title>
+  <style>
+    body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    ul { list-style-type: none; padding: 0; }
+    li { padding: 10px; background: #eef; margin-top: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>مرحباً بك</h2>
+    <p id="userEmail"></p>
+    <p>نقاطك: <span id="points">0</span></p>
+
+    <h3>رابط صفحتك على فيسبوك</h3>
+    <input type="text" id="pageInput" placeholder="ضع رابط صفحتك">
+    <button id="savePageBtn">حفظ</button>
+
+    <h3>تابع صفحات الآخرين</h3>
+    <ul id="pagesList"></ul>
+  </div>
+
+  <script type="module">
+    import { supabase } from './supabase-config.js';
+
+    let userId, userData;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) location.href = 'index.html';
+
+    const user = session.user;
+    userId = user.id;
+    document.getElementById("userEmail").innerText = user.email;
+
+    const { data } = await supabase.from('users').select('*').eq('id', userId).single();
+    userData = data || {};
+    document.getElementById("points").innerText = userData.points || 0;
+
+    document.getElementById("pageInput").value = userData.facebook_page || "";
+
+    document.getElementById("savePageBtn").onclick = async () => {
+      const url = document.getElementById("pageInput").value.trim();
+      if (!url.startsWith("http")) return alert("رابط غير صالح");
+      await supabase.from("users").upsert({ id: userId, facebook_page: url });
+      alert("تم الحفظ");
+    };
+
+    async function loadOthers() {
+      const res = await supabase.from("users").select("*");
+      const list = document.getElementById("pagesList");
+      list.innerHTML = "";
+
+      res.data.forEach(u => {
+        if (u.id === userId || !u.facebook_page || u.points < 1) return;
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <a href="${u.facebook_page}" target="_blank">${u.email}</a><br>
+          <input type="file" id="proof_${u.id}" accept="image/*">
+          <button onclick="uploadProof('${u.id}')">رفع إثبات</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    window.uploadProof = async (targetId) => {
+      const fileInput = document.getElementById("proof_" + targetId);
+      const file = fileInput.files[0];
+      if (!file) return alert("اختر صورة أولاً");
+
+      const target = await supabase.from('users').select('*').eq('id', targetId).single();
+      if (target.data.points < 1) return alert("صاحب الصفحة لا يملك نقاطاً");
+
+      await supabase.from('users').update({ points: (userData.points || 0) + 1 }).eq('id', userId);
+      await supabase.from('users').update({ points: target.data.points - 1 }).eq('id', targetId);
+
+      alert("✅ تمت العملية!");
+      loadOthers();
+    };
+
+    loadOthers();
+  </script>
+</body>
+</html>
