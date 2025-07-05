@@ -48,7 +48,7 @@
       const container = document.getElementById("usersList");
       container.innerHTML = "جاري التحميل...";
 
-      const { data, error } = await supabase.from('user').select('*');
+      const { data, error } = await supabase.from('sami').select('*');
       if (error || !data) {
         container.innerHTML = "❌ حدث خطأ أثناء تحميل المستخدمين";
         console.error(error);
