@@ -11,7 +11,7 @@
 </head>
 <body>
   <div class="box">
-    <h2>سجّل الدخول باستخدام Google</h2>
+    <h2>سجل الدخول بحساب جوجل</h2>
     <button id="loginBtn">تسجيل الدخول</button>
   </div>
 
@@ -19,10 +19,19 @@
     import { supabase } from './supabase-config.js';
 
     document.getElementById("loginBtn").onclick = async () => {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-      if (error) alert("فشل تسجيل الدخول");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: location.origin + "/dashboard.html"  // تأكد أن هذا الرابط موجود في Supabase
+        }
+      });
+      if (error) {
+        console.error("فشل تسجيل الدخول", error);
+        alert("فشل تسجيل الدخول");
+      }
     };
 
+    // إذا تم تسجيل الدخول مسبقًا
     const { data: { session } } = await supabase.auth.getSession();
     if (session) location.href = "dashboard.html";
   </script>
